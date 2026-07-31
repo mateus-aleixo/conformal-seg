@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -27,6 +28,9 @@ def export(checkpoint: Path, out: Path, size: int = 320, check: bool = True) -> 
         input_names=["image"], output_names=["prob"],
         dynamic_axes={"image": {0: "batch"}, "prob": {0: "batch"}},
         opset_version=18,  # torch's dynamo exporter implements >= 18
+        # verbose=False also silences the exporter's progress banner, which
+        # prints emoji and crashes on a Windows cp1252 console (UnicodeEncodeError)
+        verbose=False,
     )
 
     if check:
@@ -45,6 +49,9 @@ def export(checkpoint: Path, out: Path, size: int = 320, check: bool = True) -> 
 
 
 def main(argv: list[str] | None = None) -> int:
+    # dependencies may print non-ASCII; a Windows console defaults to cp1252
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(errors="replace")
     p = argparse.ArgumentParser()
     p.add_argument("--category", required=True)
     p.add_argument("--checkpoint", type=Path, default=None)

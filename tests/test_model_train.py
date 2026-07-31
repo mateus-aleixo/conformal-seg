@@ -2,8 +2,31 @@ from pathlib import Path
 
 import torch
 
-from conformal_seg.model import DefectSeg, ExportWrapper, dice_loss, seg_loss
+from conformal_seg.model import (
+    DefectSeg,
+    ExportWrapper,
+    build_kwargs,
+    dice_loss,
+    seg_loss,
+)
 from conformal_seg.train import train
+
+
+def test_pretrained_requests_aux_loss():
+    """Regression: the pretrained VOC checkpoint was trained with an auxiliary
+    head and torchvision refuses to load it under aux_loss=False. Every test
+    here builds with pretrained=False, so this argument logic is asserted
+    directly — otherwise the failure only appears on a real training run
+    (which is exactly how it was found)."""
+    assert build_kwargs(pretrained=True)["aux_loss"] is True
+    assert build_kwargs(pretrained=True)["weights"] is not None
+    assert build_kwargs(pretrained=False)["aux_loss"] is False
+    assert build_kwargs(pretrained=False)["weights"] is None
+
+
+def test_aux_head_dropped():
+    """The aux head must be gone: unused params would still take gradients."""
+    assert DefectSeg(pretrained=False).net.aux_classifier is None
 
 
 def test_forward_shape_and_head_swap():

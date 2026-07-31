@@ -16,9 +16,17 @@ Third of a series — one thesis, three modalities:
 
 *A prediction without a trustworthy confidence statement is not a decision aid.*
 
-> **Status: day one.** README pushed before the code, on purpose; the git log is the
-> honest record. Trained results land in `docs/results.md` when the training runs
-> have actually run — not before.
+> **Status: trained, calibrated, exported.** Full numbers in
+> [`docs/results.md`](docs/results.md). The short version:
+>
+> | | naive 0.5 | conformal | verdict |
+> |---|---|---|---|
+> | `metal_nut` | IoU 0.691, **FNR 0.167 ✗** | IoU 0.644, **FNR 0.055 ✓** | guarantee costs ~5 IoU points and fixes a 17% miss rate |
+> | `grid` | IoU 0.184, FNR 0.385 ✗ | IoU 0.015, **FNR 0.010 ✓**, **mask area 0.81** | guarantee honoured by flagging 81% of the image — valid and useless |
+>
+> `grid` is reported, not buried: conformal risk control guarantees *validity, not
+> utility*, and a category where the model fails is the clearest way to show what
+> the method does and does not buy you.
 
 ## Why a guarantee on a mask
 
@@ -65,22 +73,33 @@ model is *provably* careful enough, escalate the rest.
 uv sync --all-extras                      # or: pip install -e ".[dev]"
 uv run pytest                             # synthetic fixtures, CPU, no downloads
 uv run python scripts/fetch_mvtec.py      # ~5.3 GB once; extracts 2 categories
-uv run python -m conformal_seg.train --category metal_nut
-uv run python -m conformal_seg.calibrate --alpha 0.1
-uv run python -m conformal_seg.onnx_export --check
-uv run python -m conformal_seg.predict image.png --mask out.png
+uv run python -m conformal_seg.train --category metal_nut --unfreeze --lr 1e-4 --epochs 60
+uv run python -m conformal_seg.calibrate --category metal_nut --alpha 0.1
+uv run python -m conformal_seg.onnx_export --category metal_nut --check
+uv run python -m conformal_seg.predict image.png --category metal_nut --mask out.png
+```
+
+**GPU note.** `pyproject.toml` pins CPU torch from PyPI, which is what CI wants.
+For a CUDA build, install it into the venv and then invoke the venv's Python
+directly — `uv run` re-syncs the environment from `pyproject.toml` on every call
+and will silently put the CPU wheel back:
+
+```bash
+uv pip install --reinstall --index-url https://download.pytorch.org/whl/cu126 \
+    "torch==2.13.0+cu126" torchvision
+./.venv/Scripts/python.exe -m conformal_seg.train --category metal_nut --device cuda
 ```
 
 ## Roadmap
 
-| Day | Deliverable |
-|---|---|
-| D1 | This README, scaffold, fetch script, synthetic-fixture test suite, CI |
-| D2–3 | Fine-tune on `metal_nut` (overfit one batch first, then train); IoU/PR reported |
-| D4 | Second category; eval tables in `docs/results.md` |
-| D5 | Conformal masks: λ̂ per category, held-out FNR table, risk curve |
-| D6 | ONNX export + parity; torch-free `predict.py` |
-| D7+ | Polish; honest failure notes |
+| Day | Deliverable | |
+|---|---|---|
+| D1 | README, scaffold, fetch script, synthetic-fixture test suite, CI | ✅ |
+| D2–3 | Fine-tune `metal_nut`, frozen vs unfrozen, IoU reported | ✅ |
+| D4 | Second category (`grid`); eval tables in `docs/results.md` | ✅ |
+| D5 | Conformal masks: λ̂ per category, held-out FNR, mask area | ✅ |
+| D6 | ONNX export + parity; torch-free `predict.py` | ✅ |
+| Next | Tiled/high-res inference for `grid`; risk-curve plot; a defect-free control split | |
 
 ## References
 

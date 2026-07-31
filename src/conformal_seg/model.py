@@ -15,13 +15,28 @@ from torchvision.models.segmentation import (
 )
 
 
+def build_kwargs(pretrained: bool) -> dict:
+    """Constructor kwargs for the torchvision model.
+
+    The pretrained VOC checkpoint was trained WITH an auxiliary head, and
+    torchvision refuses to load it under `aux_loss=False`
+    ("expected value True but got False"). So we must request aux_loss=True
+    whenever we load those weights — and then discard the aux head, which we
+    never use. Building from scratch has no such constraint.
+    """
+    weights = DeepLabV3_MobileNet_V3_Large_Weights.DEFAULT if pretrained else None
+    return {"weights": weights, "aux_loss": True if pretrained else False}
+
+
 class DefectSeg(nn.Module):
     def __init__(self, pretrained: bool = True, freeze_backbone: bool = True):
         super().__init__()
-        weights = DeepLabV3_MobileNet_V3_Large_Weights.DEFAULT if pretrained else None
-        self.net = deeplabv3_mobilenet_v3_large(weights=weights, aux_loss=False)
+        self.net = deeplabv3_mobilenet_v3_large(**build_kwargs(pretrained))
         # swap the 21-class VOC head for a single defect logit
         self.net.classifier[-1] = nn.Conv2d(256, 1, kernel_size=1)
+        # drop the auxiliary head: forward() skips it when it is None, so it
+        # costs no compute and contributes no gradients
+        self.net.aux_classifier = None
         if freeze_backbone:
             for p in self.net.backbone.parameters():
                 p.requires_grad = False
