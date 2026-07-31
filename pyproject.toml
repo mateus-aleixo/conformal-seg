@@ -1,0 +1,36 @@
+[project]
+name = "conformal-seg"
+version = "0.1.0"
+description = "Industrial defect segmentation with conformal risk control: predicted masks provably miss at most alpha of true defect pixels."
+authors = [{ name = "Mateus Filipe Aleixo", email = "mateusfilipealeixo@gmail.com" }]
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=1.26",
+    "opencv-python-headless>=4.9",
+    "pillow>=10.0",
+    "torch>=2.2",
+    "torchvision>=0.17",
+]
+
+[project.optional-dependencies]
+# onnxscript: torch >= 2.9 exports through the dynamo path, which requires it
+export = ["onnx>=1.16", "onnxruntime>=1.18", "onnxscript>=0.1"]
+dev = ["pytest>=8.0", "onnx>=1.16", "onnxruntime>=1.18", "onnxscript>=0.1"]
+
+[project.urls]
+Repository = "https://github.com/mateus-aleixo/conformal-seg"
+Series-1 = "https://github.com/mateus-aleixo/conformal-rul"
+Series-2 = "https://github.com/mateus-aleixo/conformal-rag"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/conformal_seg"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
