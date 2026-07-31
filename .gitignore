@@ -1,0 +1,26 @@
+# dataset — fetched, licensed CC BY-NC-SA, never committed
+data/
+*.zip
+*.tar.xz
+
+# artifacts
+runs/
+*.pt
+*.onnx
+*.png
+!docs/*.png
+
+# python
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+dist/
+.pytest_cache/
+uv.lock
+
+# os / editors
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
