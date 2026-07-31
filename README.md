@@ -54,7 +54,7 @@ model is *provably* careful enough, escalate the rest.
 - **Calibration:** `conformal.py` — conformal risk control over the threshold grid,
   FNR-vs-λ risk curve, held-out verification. Same correction, same small-n
   honesty as the sibling repos.
-- **Export:** ONNX (opset 17) + parity check (max |Δ| logged); `predict.py` runs on
+- **Export:** ONNX (opset 18) + parity check (max |Δ| logged); `predict.py` runs on
   onnxruntime only, no torch at inference — the conformal-rul serving pattern.
 - **Tests/CI:** the suite runs on synthetic fixtures (random ellipse "defects"),
   no dataset, no pretrained weights, no network. Deterministic by construction.
