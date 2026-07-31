@@ -1,20 +1,23 @@
 # conformal-seg
 
+[![ci](https://github.com/mateus-aleixo/conformal-seg/actions/workflows/ci.yml/badge.svg)](https://github.com/mateus-aleixo/conformal-seg/actions/workflows/ci.yml)
+![python](https://img.shields.io/badge/python-3.11%2B-blue)
+![license](https://img.shields.io/badge/license-MIT-green)
+
 **Industrial defect segmentation whose masks carry a guarantee.** A torchvision
 segmentation model fine-tuned on MVTec AD defects, thresholded by **conformal risk
 control** so that the predicted defect region provably misses at most α of the true
 defect pixels (pixel-level false-negative rate ≤ α, finite-sample,
 distribution-free). Exported to ONNX with a parity check; inference runs torch-free.
 
-Third of a series — one thesis, three modalities:
+Second of a series — one thesis, three modalities: *a prediction without a trustworthy
+confidence statement is not a decision aid.*
 
 | repo | modality | the guarantee |
 |---|---|---|
 | [conformal-rul](https://github.com/mateus-aleixo/conformal-rul) | sensor sequences | RUL intervals with verified coverage, live on AWS Lambda |
-| [conformal-rag](https://github.com/mateus-aleixo/conformal-rag) | language | selective QA that abstains at a calibrated error rate |
 | **conformal-seg** | vision | defect masks bounding the missed-defect rate |
-
-*A prediction without a trustworthy confidence statement is not a decision aid.*
+| [conformal-rag](https://github.com/mateus-aleixo/conformal-rag) | language | selective QA that abstains at a calibrated error rate |
 
 > **Status: trained, calibrated, exported.** Full numbers in
 > [`docs/results.md`](docs/results.md). The short version:
