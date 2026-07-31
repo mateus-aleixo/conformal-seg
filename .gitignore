@@ -9,6 +9,7 @@ runs/
 *.onnx
 *.png
 !docs/*.png
+!docs/figures/*.png
 
 # python
 __pycache__/

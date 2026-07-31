@@ -19,6 +19,13 @@ confidence statement is not a decision aid.*
 | **conformal-seg** | vision | defect masks bounding the missed-defect rate |
 | [conformal-rag](https://github.com/mateus-aleixo/conformal-rag) | language | selective QA that abstains at a calibrated error rate |
 
+![Naive threshold vs conformal threshold on both categories](docs/figures/naive_vs_conformal.png)
+
+*Top row: the method earning its keep — the calibrated mask is barely larger and
+misses a third as much. Bottom row: the same method on a category the model never
+learned, honouring its 10% promise by covering most of the frame. Both rows show the
+test image closest to that category's held-out mean, not the best-looking one.*
+
 > **Status: trained, calibrated, exported.** Full numbers in
 > [`docs/results.md`](docs/results.md). The short version:
 >
