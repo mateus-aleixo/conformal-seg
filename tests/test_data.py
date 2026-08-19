@@ -28,7 +28,7 @@ def test_load_pair_shapes_and_ranges(synth_root):
     item = discover_items(synth_root, "synth")[0]
     rgb, mask = load_pair(item, size=64)
     assert rgb.shape == (64, 64, 3) and rgb.dtype == np.float32
-    assert 0.0 <= rgb.min() and rgb.max() <= 1.0
+    assert rgb.min() >= 0.0 and rgb.max() <= 1.0
     assert mask.shape == (64, 64) and set(np.unique(mask)) <= {0, 1}
     assert mask.sum() > 0  # the ellipse survived the resize
 

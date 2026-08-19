@@ -33,7 +33,7 @@ def evaluate(model: DefectSeg, loader: DataLoader, device: str) -> float:
     scores = []
     for x, y in loader:
         prob = torch.sigmoid(model(x.to(device))).cpu().numpy()
-        for p, t in zip(prob[:, 0], y.numpy()[:, 0]):
+        for p, t in zip(prob[:, 0], y.numpy()[:, 0], strict=True):
             scores.append(iou(p >= 0.5, t >= 0.5))
     return float(np.mean(scores)) if scores else 0.0
 

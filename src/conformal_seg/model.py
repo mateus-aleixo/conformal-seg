@@ -25,7 +25,7 @@ def build_kwargs(pretrained: bool) -> dict:
     never use. Building from scratch has no such constraint.
     """
     weights = DeepLabV3_MobileNet_V3_Large_Weights.DEFAULT if pretrained else None
-    return {"weights": weights, "aux_loss": True if pretrained else False}
+    return {"weights": weights, "aux_loss": bool(pretrained)}
 
 
 class DefectSeg(nn.Module):

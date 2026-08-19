@@ -88,7 +88,9 @@ def to_tensors(rgb01: np.ndarray, mask: np.ndarray) -> tuple[torch.Tensor, torch
     )
 
 
-def augment(rgb01: np.ndarray, mask: np.ndarray, rng: random.Random) -> tuple[np.ndarray, np.ndarray]:
+def augment(
+    rgb01: np.ndarray, mask: np.ndarray, rng: random.Random
+) -> tuple[np.ndarray, np.ndarray]:
     """Flips and quarter rotations — label-preserving for surface defects."""
     k = rng.randrange(4)
     if k:

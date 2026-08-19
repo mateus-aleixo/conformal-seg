@@ -19,6 +19,7 @@ import json
 from pathlib import Path
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
@@ -101,7 +102,7 @@ def panel(ax, run: str, title: str, verdict: str) -> None:
 
 def main() -> int:
     fig, axes = plt.subplots(1, 3, figsize=(14.4, 5.4), sharey=True)
-    for ax, (run, title, verdict) in zip(axes, PANELS):
+    for ax, (run, title, verdict) in zip(axes, PANELS, strict=True):
         panel(ax, run, title, verdict)
     axes[0].set_ylabel("rate", fontsize=9, color=MUTED)
 

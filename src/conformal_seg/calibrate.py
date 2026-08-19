@@ -9,7 +9,6 @@ import argparse
 import json
 from pathlib import Path
 
-import numpy as np
 import torch
 
 from .conformal import calibrate, control_curve, control_report, held_out_report
@@ -68,7 +67,9 @@ def main(argv: list[str] | None = None) -> int:
     cal_probs, cal_masks = predict_probs(model, DefectSegDataset(splits["cal"], a.size), a.device)
     cal = calibrate(cal_probs, cal_masks, alpha=a.alpha)
 
-    test_probs, test_masks = predict_probs(model, DefectSegDataset(splits["test"], a.size), a.device)
+    test_probs, test_masks = predict_probs(
+        model, DefectSegDataset(splits["test"], a.size), a.device
+    )
     report = held_out_report(test_probs, test_masks, cal)
 
     # Defect-free control: what the guarantee costs on parts that are fine.

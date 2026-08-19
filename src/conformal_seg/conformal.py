@@ -38,7 +38,7 @@ class Calibration:
 
 
 def losses_at(probs: list[np.ndarray], masks: list[np.ndarray], t: float) -> np.ndarray:
-    return np.array([fnr(p >= t, m) for p, m in zip(probs, masks)], dtype=float)
+    return np.array([fnr(p >= t, m) for p, m in zip(probs, masks, strict=True)], dtype=float)
 
 
 def calibrate(

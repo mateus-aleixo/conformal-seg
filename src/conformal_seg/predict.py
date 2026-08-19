@@ -49,7 +49,8 @@ def main(argv: list[str] | None = None) -> int:
     prob, mask = predict_mask(a.image, run_dir / "model.onnx", thr, a.size)
     frac = float(mask.mean())
     print(f"threshold {thr:.3f} (guarantees FNR <= {alpha} in expectation)")
-    print(f"defect fraction: {frac:.4f} ({'defect region found' if frac > 0 else 'no defect at this confidence'})")
+    verdict = "defect region found" if frac > 0 else "no defect at this confidence"
+    print(f"defect fraction: {frac:.4f} ({verdict})")
     if a.mask:
         Image.fromarray(mask * 255).save(a.mask)
         print(f"mask written: {a.mask}")

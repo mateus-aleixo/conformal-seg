@@ -51,7 +51,7 @@ def test_export_wrapper_outputs_probabilities():
     wrapped = ExportWrapper(DefectSeg(pretrained=False)).eval()
     with torch.no_grad():
         out = wrapped(torch.randn(1, 3, 64, 64))
-    assert 0.0 <= out.min() and out.max() <= 1.0
+    assert out.min() >= 0.0 and out.max() <= 1.0
 
 
 def test_train_smoke_runs_and_checkpoints(synth_root, tmp_path):

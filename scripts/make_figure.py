@@ -21,6 +21,7 @@ import json
 from pathlib import Path
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
@@ -43,7 +44,7 @@ def pick_representative(probs, masks, thr):
     Deliberately not the best-looking one: the figure has to represent the
     reported numbers, not beat them.
     """
-    f = np.array([fnr(p >= thr, m) for p, m in zip(probs, masks)])
+    f = np.array([fnr(p >= thr, m) for p, m in zip(probs, masks, strict=True)])
     return int(np.argmin(np.abs(f - f.mean())))
 
 

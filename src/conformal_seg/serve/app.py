@@ -86,7 +86,7 @@ def _mask_png_b64(mask: np.ndarray) -> str:
     from PIL import Image
 
     buf = io.BytesIO()
-    Image.fromarray((mask.astype(np.uint8) * 255)).save(buf, format="PNG")
+    Image.fromarray(mask.astype(np.uint8) * 255).save(buf, format="PNG")
     return base64.b64encode(buf.getvalue()).decode()
 
 

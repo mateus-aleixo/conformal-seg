@@ -87,7 +87,7 @@ def test_discovery_separates_good_from_defective(synth_root):
     img = load_image(good[0], size=32)
     assert img.shape == (32, 32, 3)
     assert img.dtype == np.float32
-    assert 0.0 <= float(img.min()) and float(img.max()) <= 1.0
+    assert float(img.min()) >= 0.0 and float(img.max()) <= 1.0
 
 
 def test_missing_good_dir_returns_empty(tmp_path):
