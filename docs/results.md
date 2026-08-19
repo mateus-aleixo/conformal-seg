@@ -230,6 +230,42 @@ At a trigger of 0.10 the system escalates clean parts *more often than defective
 ones*. There is no threshold and no trigger that separates them, because the
 model has no discriminative signal on this category to separate with.
 
+### Does it replicate? Five categories
+
+The `metal_nut` result above is n = 1. Three more categories were trained under
+the identical recipe (unfrozen backbone, 60 epochs, lr 1e-4, 320 px) and
+calibrated under both losses, to test whether the instance loss's advantage is
+real or was luck on one class.
+
+| category | best val IoU | loss | λ̂ | held-out risk | mask area | false alarms |
+|---|---|---|---|---|---|---|
+| `metal_nut` | 0.621 | pixel | 0.130 | 0.055 | 0.207 | 0.045 |
+| | | **instance** | **0.290** | **0.025** | **0.186** | **0.000** |
+| `tile` | 0.729 | pixel | 0.130 | 0.025 | 0.125 | 0.061 |
+| | | **instance** | **0.540** | **0.000** | **0.084** | **0.000** |
+| `leather` | 0.393 | pixel | 0.180 | 0.063 | 0.032 | 0.344 |
+| | | **instance** | **0.260** | **0.000** | **0.018** | **0.062** |
+| `carpet` | 0.520 | pixel | 0.250 | 0.085 | 0.033 | 0.143 |
+| | | **instance** | **0.540** | **0.053** | **0.024** | **0.036** |
+| `grid` | 0.068 | pixel | 0.090 | 0.010 | 0.814 | 1.000 |
+| | | instance | 0.110 | 0.028 | 0.639 | 1.000 |
+
+**It replicates, on four of four categories where the model learned anything.**
+In every one the instance loss admits a higher threshold, draws a smaller mask,
+holds α, and cuts the false-alarm rate. On `metal_nut` and `tile` it removes
+false alarms entirely. On `leather` it is the difference between escalating a
+third of all clean parts and escalating one in sixteen.
+
+`leather` is the clearest case for the argument. Its pixel-loss operating point
+escalates **34.4%** of defect-free parts, which is not a deployable system, and
+nothing in the conformal report would have said so: held-out FNR is 0.063,
+comfortably inside α = 0.10. Changing what the guarantee is *about* takes the
+same model, the same images and the same α to a 6.2% false-alarm rate.
+
+`grid` is the control, and behaves as a control should: the loss change moves the
+threshold and the mask a little and the decision not at all, because there is no
+signal for a better contract to exploit.
+
 ### What the two experiments together establish
 
 The pixel-level contract was genuinely wrong: fixing it improved every category

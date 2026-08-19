@@ -31,6 +31,26 @@ test image closest to that category's held-out mean, not the best-looking one.*
 
 Full numbers in [`docs/results.md`](docs/results.md). The short version:
 
+**Five categories, both losses, α = 0.10.** The last column is the one the
+guarantee says nothing about, and the one that decides deployability:
+
+| category | val IoU | false alarms, pixel loss | false alarms, **instance loss** |
+|---|---|---|---|
+| `tile` | 0.729 | 0.061 | **0.000** |
+| `metal_nut` | 0.621 | 0.045 | **0.000** |
+| `carpet` | 0.520 | 0.143 | **0.036** |
+| `leather` | 0.393 | 0.344 | **0.062** |
+| `grid` | 0.068 | 1.000 | 1.000 |
+
+Every category where the model learned anything improves, and two lose their
+false alarms entirely. `leather` is the sharpest case: its pixel-loss operating
+point escalates **34% of defect-free parts**, which is not a deployable system,
+and the conformal report would never have said so (held-out FNR 0.063, well
+inside α). `grid` is the control and does not move, because there is no signal to
+exploit.
+
+On `metal_nut`, the naive-versus-conformal comparison in detail:
+
 | | naive 0.5 | conformal | false alarms on clean parts | verdict |
 |---|---|---|---|---|
 | `metal_nut` | IoU 0.691, **FNR 0.167 ✗** | IoU 0.644, **FNR 0.055 ✓** | 0.000 → **0.045** (1 of 22) | the guarantee costs about 5 IoU points and one false alarm in 22, and fixes a 17% miss rate |
@@ -70,7 +90,8 @@ when the model is *provably* careful enough, and escalate the rest.
 ## Design
 
 - **Data.** [MVTec AD](https://www.mvtec.com/company/research/datasets/mvtec-ad)
-  (Bergmann et al., CVPR 2019), categories `metal_nut` and `grid`. MVTec AD is an
+  (Bergmann et al., CVPR 2019), categories `metal_nut`, `tile`, `leather`,
+  `carpet` and `grid`. MVTec AD is an
   anomaly-detection benchmark, so defect masks exist only in its test split. This
   repo therefore follows the supervised protocol: the mask-annotated images are
   re-split 60/20/20 into train, calibration and test. That is stated plainly because

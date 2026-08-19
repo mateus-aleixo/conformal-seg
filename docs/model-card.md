@@ -2,8 +2,8 @@
 
 ## What it is
 
-Binary defect-segmentation networks for two MVTec AD categories (`metal_nut`
-and `grid`), thresholded by conformal risk control so that the mask a caller
+Binary defect-segmentation networks for five MVTec AD categories (`metal_nut`,
+`tile`, `leather`, `carpet` and `grid`), thresholded by conformal risk control so that the mask a caller
 receives provably misses at most α of the true defect pixels, in expectation,
 finite-sample and distribution-free. The served artifact is a pass/escalate
 decision rather than a mask.
@@ -32,10 +32,13 @@ test split. This repo therefore follows a supervised protocol: every
 mask-annotated defect image is re-split 60/20/20 into train / calibration / test
 by a seeded shuffle (seed 17).
 
-| category | train | calibration | test | defect-free control | defect types |
-|---|---|---|---|---|---|
-| `metal_nut` | 55 | 18 | 20 | 22 | bent, color, flip, scratch |
-| `grid` | 34 | 11 | 12 | 21 | bent, broken, glue, metal contamination, thread |
+| category | train | calibration | test | defect-free control |
+|---|---|---|---|---|
+| `metal_nut` | 55 | 18 | 20 | 22 |
+| `leather` | 55 | 18 | 19 | 32 |
+| `carpet` | 53 | 17 | 19 | 28 |
+| `tile` | 50 | 16 | 18 | 33 |
+| `grid` | 34 | 11 | 12 | 21 |
 
 n is small. That is the honest condition of the dataset under this protocol, and
 it is the regime conformal calibration is built for: the guarantee is
@@ -66,16 +69,27 @@ trade the guarantee is blind to.
 
 Full tables in [results.md](results.md), at α = 0.10 on the held-out split.
 
-| category | threshold | IoU | FNR | mask area | false alarms on clean parts |
-|---|---|---|---|---|---|
-| `metal_nut` | 0.500 naive | 0.691 | 0.167 ✗ | 0.173 | 0.000 |
-| `metal_nut` | 0.130 conformal, pixel loss | 0.644 | **0.055 ✓** | 0.207 | **0.045** (1 of 22) |
-| `metal_nut` | 0.290 conformal, instance loss | | **0.025 ✓** | 0.186 | **0.000** (0 of 22) |
-| `grid` | 0.500 naive | 0.184 | 0.385 ✗ | | 0.429 |
-| `grid` | 0.090 conformal | 0.015 | **0.010 ✓** | 0.814 | **1.000** (21 of 21) |
+All five categories, both losses. Every row honours α; the last column decides
+which are deployable, and α says nothing about it.
 
-Both conformal rows honour α. Only one of them is deployable, which is the point
-of reporting the last column.
+| category | val IoU | loss | λ̂ | risk | mask | false alarms |
+|---|---|---|---|---|---|---|
+| `tile` | 0.729 | pixel | 0.130 | 0.025 | 0.125 | 0.061 |
+| `tile` | | **instance** | 0.540 | 0.000 | 0.084 | **0.000** |
+| `metal_nut` | 0.621 | pixel | 0.130 | 0.055 | 0.207 | 0.045 |
+| `metal_nut` | | **instance** | 0.290 | 0.025 | 0.186 | **0.000** |
+| `carpet` | 0.520 | pixel | 0.250 | 0.085 | 0.033 | 0.143 |
+| `carpet` | | **instance** | 0.540 | 0.053 | 0.024 | **0.036** |
+| `leather` | 0.393 | pixel | 0.180 | 0.063 | 0.032 | 0.344 |
+| `leather` | | **instance** | 0.260 | 0.000 | 0.018 | **0.062** |
+| `grid` | 0.068 | pixel | 0.090 | 0.010 | 0.814 | 1.000 |
+| `grid` | | instance | 0.110 | 0.028 | 0.639 | 1.000 |
+
+The instance loss improves the false-alarm rate on four of four categories where
+the model learned anything, and removes it entirely on two. `leather` is the
+clearest warning: at the pixel operating point it escalates **34% of clean
+parts** while reporting a held-out FNR of 0.063, comfortably inside α = 0.10.
+A conformal report alone would have called that system fine.
 
 ## Limitations
 

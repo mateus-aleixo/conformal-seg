@@ -19,6 +19,8 @@ from urllib.request import Request, urlopen
 
 URL = ("https://huggingface.co/datasets/hdtech/mvtech_anomaly_detection/"
        "resolve/main/mvtech_anomaly_detection.zip")
+# Default pair, kept so an unflagged run reproduces the published results.
+# --categories takes any subset of the fifteen MVTec AD classes.
 CATEGORIES = ("metal_nut", "grid")
 
 DATA = Path(__file__).parent.parent / "data"
@@ -43,18 +45,18 @@ def download() -> None:
     print(f"  done: {ZIP.stat().st_size / 1e9:.2f} GB")
 
 
-def extract() -> None:
+def extract(categories: tuple[str, ...] = CATEGORIES) -> None:
     ROOT.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(ZIP) as z:
         names = z.namelist()
         prefix = ""  # archives sometimes nest under a single top folder
         top = {n.split("/", 1)[0] for n in names if "/" in n}
-        if len(top) == 1 and not any(t in CATEGORIES for t in top):
+        if len(top) == 1 and not any(t in categories for t in top):
             prefix = f"{next(iter(top))}/"
-        wanted = [n for n in names if any(n.startswith(f"{prefix}{c}/") for c in CATEGORIES)]
+        wanted = [n for n in names if any(n.startswith(f"{prefix}{c}/") for c in categories)]
         if not wanted:
-            sys.exit(f"no {CATEGORIES} entries found in the archive; inspect {ZIP}")
-        print(f"extracting {len(wanted)} files for {CATEGORIES} ...")
+            sys.exit(f"no {categories} entries found in the archive; inspect {ZIP}")
+        print(f"extracting {len(wanted)} files for {categories} ...")
         for n in wanted:
             target = ROOT / n.removeprefix(prefix)
             if n.endswith("/"):
@@ -69,9 +71,11 @@ def extract() -> None:
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--keep-zip", action="store_true")
+    ap.add_argument("--categories", nargs="+", default=list(CATEGORIES),
+                    help="MVTec AD classes to extract")
     args = ap.parse_args()
     download()
-    extract()
+    extract(tuple(args.categories))
     if not args.keep_zip:
         ZIP.unlink(missing_ok=True)
         print("archive removed (use --keep-zip to keep it)")
