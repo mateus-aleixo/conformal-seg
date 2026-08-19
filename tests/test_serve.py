@@ -226,3 +226,27 @@ def test_registry_refuses_an_incomplete_run(tmp_path):
     (run / "model.onnx").write_bytes(b"not really onnx")
     with pytest.raises(FileNotFoundError, match="calibration"):
         registry.build(run, tmp_path / "models" / "half", "half")
+
+
+def test_models_does_not_load_any_network(client, monkeymodule):
+    """Listing categories is a metadata request. Building Bundles here loaded one
+    onnxruntime session per category, which blew the Lambda cold-start timeout
+    once five were registered."""
+    from conformal_seg.serve import app as app_module
+
+    calls = []
+    real = app_module.Bundle
+
+    class Counting(real):
+        def __init__(self, category):
+            calls.append(category)
+            super().__init__(category)
+
+    monkeymodule.setattr(app_module, "Bundle", Counting)
+    app_module.bundle.cache_clear()
+    try:
+        assert client.get("/models").status_code == 200
+        assert calls == [], f"/models constructed Bundles: {calls}"
+    finally:
+        monkeymodule.setattr(app_module, "Bundle", real)
+        app_module.bundle.cache_clear()

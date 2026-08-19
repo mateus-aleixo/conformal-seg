@@ -98,10 +98,17 @@ def health() -> dict:
 
 @app.get("/models", response_model=list[ModelInfo])
 def models() -> list[ModelInfo]:
+    """Read the manifests directly. Do NOT build Bundles here.
+
+    Everything below comes from JSON, but a Bundle also opens an onnxruntime
+    session, so listing five categories used to load five networks to answer a
+    metadata request. On a cold Lambda that exceeded the timeout and the deploy
+    smoke test caught it: /health passed while /models did not.
+    """
     out = []
     for manifest_path in sorted(MODEL_ROOT.glob(f"*/{SERVING_MANIFEST}")):
-        b = bundle(manifest_path.parent.name)
-        m, control = b.manifest, b.control
+        m = json.loads(manifest_path.read_text())
+        control = m.get("control", {})
         out.append(
             ModelInfo(
                 category=m["category"],
