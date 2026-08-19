@@ -1,6 +1,6 @@
 # Results
 
-Produced 2026-07-31 on code at `3ca4d33` (plus the `aux_loss` and ONNX fixes made
+Produced on code at `3ca4d33` (plus the `aux_loss` and ONNX fixes made
 during this run). Hardware: RTX 3060 Laptop, 6 GB, CUDA 12.6, torch 2.13.
 Reproduce: `scripts/fetch_mvtec.py` → `train` → `calibrate` → `onnx_export`.
 
