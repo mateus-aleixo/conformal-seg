@@ -9,7 +9,7 @@ Reproduce: `scripts/fetch_mvtec.py` → `train` → `calibrate` → `onnx_export
 **Conformal risk control delivers exactly what it promises, and nothing more:
 validity, not usefulness.** On a model that works, it costs ~5 IoU points and fixes
 a miss rate that would otherwise have broken the 10% promise. On a model that
-doesn't, it still honours the promise — by flagging 81% of every image.
+doesn't, it still honours the promise: by flagging 81% of every image.
 
 Both cases are below. The second one is the reason this file exists.
 
@@ -23,7 +23,7 @@ Supervised re-split of the mask-annotated defect images, seed 17, 60/20/20:
 | `grid` | 34 | 11 | 12 | bent, broken, glue, metal_contamination, thread |
 
 n is small. That is the honest condition of the dataset under a supervised
-protocol, and it is precisely the regime conformal calibration is built for —
+protocol, and it is precisely the regime conformal calibration is built for:
 the guarantee is finite-sample, not asymptotic.
 
 ## Training
@@ -41,7 +41,7 @@ split; the test split is untouched until the table after this one):
 | `grid` @ 640 px | unfrozen | 60 | 1e-4 | **0.359** |
 
 Unfreezing the backbone is worth ~0.18 IoU on `metal_nut` and nothing that
-matters on `grid`. Roughly 1.6 s/epoch — the whole table is under 6 minutes of
+matters on `grid`. Roughly 1.6 s/epoch: the whole table is under 6 minutes of
 compute, which is a fair description of how small this dataset is.
 
 ## Conformal calibration (α = 0.10), on the held-out test split
@@ -49,26 +49,26 @@ compute, which is a fair description of how small this dataset is.
 Threshold fitted on the calibration split only; every number below is from data
 the threshold never saw.
 
-### `metal_nut` — the guarantee is worth having
+### `metal_nut`: the guarantee is worth having
 
 | threshold | IoU | precision | recall | **FNR** | mask area |
 |---|---|---|---|---|---|
 | 0.500 (naive) | **0.691** | 0.818 | 0.833 | **0.167 ✗** | 0.173 |
 | 0.130 (conformal) | 0.644 | 0.672 | 0.945 | **0.055 ✓** | 0.207 |
 
-The naive threshold looks better on IoU and **misses 16.7% of defect pixels** — it
+The naive threshold looks better on IoU and **misses 16.7% of defect pixels**: it
 would have violated a 10% promise nobody checked. The conformal threshold gives up
 4.7 IoU points and 15 points of precision to buy a verified miss rate of 5.5%, with
 masks 20% larger. For "can this part ship unseen?", that is the correct trade.
 
-### `grid` — the guarantee holds and the output is useless
+### `grid`: the guarantee holds and the output is useless
 
 | threshold | IoU | precision | recall | **FNR** | mask area |
 |---|---|---|---|---|---|
 | 0.500 (naive) | 0.184 | 0.292 | 0.615 | 0.385 ✗ | 0.024 |
 | 0.090 (conformal) | 0.015 | 0.015 | 0.990 | **0.010 ✓** | **0.814** |
 
-The model never learned `grid` — thin, low-contrast texture defects, 34 training
+The model never learned `grid`: thin, low-contrast texture defects, 34 training
 images, downsampled to 320 px. Calibration did its job perfectly and the result is
 absurd: to miss at most 10% of defect pixels with a model this weak, the only
 admissible threshold flags **81% of the image**. FNR 0.0096, IoU 0.015.
@@ -77,13 +77,13 @@ This is the point worth taking away. Conformal risk control is a *validity*
 guarantee, not a quality guarantee: it will always find a threshold that honours α,
 and when the underlying model is bad that threshold is "flag almost everything".
 The correct reading of a `grid` deployment is not "we have a guarantee" but
-"mask area 0.81 means there is no usable signal here — fix the model, or don't
+"mask area 0.81 means there is no usable signal here: fix the model, or don't
 automate this category". Reporting mask area beside FNR is what makes that legible;
 a paper reporting only coverage would have called this a success.
 
 What would actually fix `grid`: higher resolution or tiled inference (its defects
 are a few pixels wide), more annotated data, and a texture-anomaly approach rather
-than supervised segmentation — which is what MVTec AD is designed for in the first
+than supervised segmentation, which is what MVTec AD is designed for in the first
 place.
 
 ## The defect-free control split
@@ -184,17 +184,17 @@ Parity against torch on random inputs, max |Δ|:
 | `metal_nut` | 2.26e-06 | 493 KB |
 | `grid` | 3.70e-06 | 493 KB |
 
-Both under the 1e-4 gate. Inference path is onnxruntime only — no torch at serving
+Both under the 1e-4 gate. Inference path is onnxruntime only: no torch at serving
 time, same pattern as [conformal-rul](https://github.com/mateus-aleixo/conformal-rul).
 
 ## Bugs this run found
 
 Two, both invisible to the test suite until real data and real weights showed up:
 
-1. **`aux_loss`** — the pretrained VOC checkpoint was trained with an auxiliary
+1. **`aux_loss`**: the pretrained VOC checkpoint was trained with an auxiliary
    head and torchvision refuses to load it under `aux_loss=False`. Every test built
    with `pretrained=False`, so the failure only appeared on the first real training
    run. Fixed, and the argument logic is now asserted directly in a CI-safe test.
-2. **ONNX export crashed on Windows** — torch's exporter prints a ✅ progress banner
+2. **ONNX export crashed on Windows**: torch's exporter prints a ✅ progress banner
    that a cp1252 console cannot encode. Fixed with `verbose=False` plus a stdout
    reconfigure.

@@ -198,6 +198,13 @@ uv pip install --reinstall --index-url https://download.pytorch.org/whl/cu126 \
 ./.venv/Scripts/python.exe -m conformal_seg.train --category metal_nut --device cuda
 ```
 
+## Documentation
+
+[Results](docs/results.md) ·
+[Architecture](docs/architecture.md) ·
+[Model card](docs/model-card.md) ·
+[Deployment](docs/deploy.md)
+
 ## Scope
 
 Both categories are trained, calibrated, exported to ONNX and parity-checked, with
