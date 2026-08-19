@@ -17,7 +17,7 @@ confidence statement is not a decision aid*, to three different kinds of data:
 | repo | modality | the guarantee |
 |---|---|---|
 | [conformal-rul](https://github.com/mateus-aleixo/conformal-rul) | sensor sequences | RUL intervals with verified coverage, live on AWS Lambda |
-| **conformal-seg** | vision | defect masks bounding the missed-defect rate |
+| **conformal-seg** | vision | defect masks bounding the missed-defect rate, live on AWS Lambda |
 | [conformal-rag](https://github.com/mateus-aleixo/conformal-rag) | language | selective QA that abstains at a calibrated error rate |
 
 ![Naive threshold vs conformal threshold on both categories](docs/figures/naive_vs_conformal.png)
@@ -105,12 +105,26 @@ response carries the guarantee *and* the false-alarm rate measured on the contro
 split, because the one this service can prove is not the one that decides whether it
 is deployable.
 
+**Live**: `https://6s8ozlsit4.execute-api.eu-west-1.amazonaws.com`
+
 ```bash
-# build the serving registry from a training run, then run the container
-python -m conformal_seg.registry --run metal_nut
+curl https://6s8ozlsit4.execute-api.eu-west-1.amazonaws.com/models
+```
+
+Serverless, so the first request after an idle period pays a cold start (~12 s here:
+a 520 MB image and a MobileNetV3 graph); warm requests are ~0.45 s. Throttled to
+5 req/s on purpose.
+
+Both categories are published, including the one that does not work. Calling
+`/models` returns `metal_nut` at a 0.045 false-alarm rate next to `grid` at 1.000,
+which is the repo's point in a form you can curl.
+
+Or run it locally, the same image:
+
+```bash
+python -m conformal_seg.registry --run metal_nut   # build the registry first
 docker compose up --build
 curl localhost:8000/health
-curl localhost:8000/models
 ```
 
 ```bash
@@ -150,11 +164,16 @@ ones. Training and serving therefore share one implementation in
 [`preprocess.py`](src/conformal_seg/preprocess.py), and `registry.py` reads the input
 resolution out of the ONNX graph rather than taking it from a flag.
 
-**One difference from conformal-rul:** that repo commits its serving registry, because
-its exported networks are a few hundred KB. This one carries a MobileNetV3 backbone at
-42 MB per category, which does not belong in git, so `models/` is built locally and
-baked into the image at build time. A container with no registry answers 503 on
-`/models` rather than failing to start.
+**Deployment** is the conformal-rul arrangement repeated: Terraform for ECR, Lambda
+and the HTTP API, GitHub Actions authenticating by OIDC with no stored keys, a
+throttled stage and a budget alarm. Two things differ, both written up in
+[docs/deploy.md](docs/deploy.md): the IAM OIDC provider is account-global so this
+repo *references* the one conformal-rul created rather than declaring a second, and
+the registry is not committed. rul's networks are a few hundred KB; a MobileNetV3
+backbone is 42 MB per category, so the registry ships as a release asset that the
+deploy workflow fetches before building. A container with no registry answers 503 on
+`/models` rather than failing to start, which is why the deploy smoke test checks
+`/models` and not just `/health`.
 
 ## Quickstart
 

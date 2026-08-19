@@ -35,3 +35,10 @@ uv.lock
 .idea/
 Thumbs.db
 .DS_Store
+
+# Terraform (state is local and holds account ids; never committed)
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfvars
