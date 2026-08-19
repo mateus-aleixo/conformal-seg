@@ -22,6 +22,8 @@ import torch
 from PIL import Image
 from torch.utils.data import Dataset
 
+from .preprocess import load_image, normalize_chw
+
 SPLITS = ("train", "cal", "test")
 
 
@@ -67,26 +69,21 @@ def split_items(
 
 
 def load_pair(item: Item, size: int) -> tuple[np.ndarray, np.ndarray]:
-    """image float32 [0,1] RGB HWC; mask uint8 {0,1} HW. openCV in, pillow for mask."""
-    bgr = cv2.imread(str(item.image_path), cv2.IMREAD_COLOR)
-    if bgr is None:
-        raise FileNotFoundError(item.image_path)
-    rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
-    rgb = cv2.resize(rgb, (size, size), interpolation=cv2.INTER_AREA)
+    """image float32 [0,1] RGB HWC; mask uint8 {0,1} HW. openCV in, pillow for mask.
+
+    The image half goes through `preprocess.load_image`, the same call the serving
+    container makes, so a calibrated threshold stays valid at inference.
+    """
+    rgb = load_image(item.image_path, size)
 
     mask_img = Image.open(item.mask_path).convert("L").resize((size, size), Image.NEAREST)
     mask = (np.asarray(mask_img) > 127).astype(np.uint8)
-    return rgb.astype(np.float32) / 255.0, mask
-
-
-_IMAGENET_MEAN = np.array([0.485, 0.456, 0.406], dtype=np.float32)
-_IMAGENET_STD = np.array([0.229, 0.224, 0.225], dtype=np.float32)
+    return rgb, mask
 
 
 def to_tensors(rgb01: np.ndarray, mask: np.ndarray) -> tuple[torch.Tensor, torch.Tensor]:
-    x = (rgb01 - _IMAGENET_MEAN) / _IMAGENET_STD
     return (
-        torch.from_numpy(x.transpose(2, 0, 1).copy()),
+        torch.from_numpy(normalize_chw(rgb01)),
         torch.from_numpy(mask.astype(np.float32))[None],
     )
 
@@ -170,16 +167,6 @@ def discover_good_items(root: Path, category: str) -> list[Path]:
     return sorted(good.glob("*.png")) if good.is_dir() else []
 
 
-def load_image(path: Path, size: int) -> np.ndarray:
-    """image float32 [0,1] RGB HWC. Same decode path as load_pair, no mask."""
-    bgr = cv2.imread(str(path), cv2.IMREAD_COLOR)
-    if bgr is None:
-        raise FileNotFoundError(path)
-    rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
-    rgb = cv2.resize(rgb, (size, size), interpolation=cv2.INTER_AREA)
-    return rgb.astype(np.float32) / 255.0
-
-
 class GoodImageDataset(Dataset):
     """Defect-free images only. Yields the input tensor; there is no target."""
 
@@ -191,6 +178,4 @@ class GoodImageDataset(Dataset):
         return len(self.paths)
 
     def __getitem__(self, i: int) -> torch.Tensor:
-        rgb = load_image(self.paths[i], self.size)
-        x = (rgb - _IMAGENET_MEAN) / _IMAGENET_STD
-        return torch.from_numpy(x.transpose(2, 0, 1).copy())
+        return torch.from_numpy(normalize_chw(load_image(self.paths[i], self.size)))

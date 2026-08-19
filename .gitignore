@@ -9,6 +9,12 @@ runs/
 # numbers, and scripts/make_control_figure.py rebuilds the figure from them
 # without a GPU or a dataset download.
 !runs/*/calibration.json
+
+# serving registry: built locally from runs/ by conformal_seg.registry.
+# 42 MB of MobileNetV3 per category, so unlike conformal-rul it is not
+# committed; the Dockerfile bakes whatever is present at build time.
+models/
+!models/.gitkeep
 *.pt
 *.onnx
 *.png

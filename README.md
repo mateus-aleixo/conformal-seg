@@ -90,12 +90,71 @@ when the model is *provably* careful enough, and escalate the rest.
   loss cannot see, reporting the false-alarm rate and flagged area at both the naive
   and conformal thresholds. A guarantee reported without this number is half a
   result.
-- **Export.** ONNX (opset 18) plus a parity check with max |Δ| logged. `predict.py`
-  runs on onnxruntime only, with no torch at inference, following the conformal-rul
-  serving pattern.
+- **Export and serving.** ONNX (opset 18) plus a parity check with max |Δ| logged,
+  then a FastAPI service on onnxruntime, in the same one-image-two-habitats container
+  conformal-rul uses. See below.
 - **Tests and CI.** The suite runs on synthetic fixtures (random ellipse "defects"),
   with no dataset, no pretrained weights and no network. Deterministic by
   construction.
+
+## Serving
+
+The service returns a **decision**, not a picture. A mask is an intermediate; what an
+inspection line acts on is pass or escalate, and the number that justifies it. Every
+response carries the guarantee *and* the false-alarm rate measured on the control
+split, because the one this service can prove is not the one that decides whether it
+is deployable.
+
+```bash
+# build the serving registry from a training run, then run the container
+python -m conformal_seg.registry --run metal_nut
+docker compose up --build
+curl localhost:8000/health
+curl localhost:8000/models
+```
+
+```bash
+curl -X POST "localhost:8000/predict?category=metal_nut" -F image=@part.png
+```
+
+```json
+{
+  "category": "metal_nut",
+  "decision": "escalate",
+  "flagged_fraction": 0.073451,
+  "min_area_frac": 0.001,
+  "input_size": 320,
+  "guarantee": {
+    "alpha": 0.1,
+    "threshold": 0.13,
+    "n_calibration": 18,
+    "held_out_fnr": 0.0551,
+    "false_alarm_rate": 0.0455
+  }
+}
+```
+
+Add `&return_mask=true` for the binary mask as a base64 PNG, or `&min_area_frac=...`
+to move the escalation trigger. Interactive docs at `localhost:8000/docs`.
+
+**Torch-free, and CI proves it.** The image installs the package with `--no-deps` on
+top of a pinned serving set, so torch and torchvision (base dependencies, needed only
+for training) never enter it. That is easy to break by editing `pyproject.toml` and
+invisible until someone looks at a 2 GB image, so CI builds the container, asserts
+`import torch` fails inside it, and smoke-tests the API.
+
+openCV does stay in the image. The calibrated threshold is a statement about a
+pipeline, not a set of weights: serve an image that was decoded or resized
+differently and the probability maps shift underneath a threshold fitted for the old
+ones. Training and serving therefore share one implementation in
+[`preprocess.py`](src/conformal_seg/preprocess.py), and `registry.py` reads the input
+resolution out of the ONNX graph rather than taking it from a flag.
+
+**One difference from conformal-rul:** that repo commits its serving registry, because
+its exported networks are a few hundred KB. This one carries a MobileNetV3 backbone at
+42 MB per category, which does not belong in git, so `models/` is built locally and
+baked into the image at build time. A container with no registry answers 503 on
+`/models` rather than failing to start.
 
 ## Quickstart
 
