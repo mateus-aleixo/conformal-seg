@@ -38,6 +38,7 @@ split; the test split is untouched until the table after this one):
 | **`metal_nut`** | **unfrozen** | **60** | **1e-4** | **0.621** |
 | `grid` | frozen | 40 | 1e-3 | 0.048 |
 | **`grid`** | **unfrozen** | **60** | **1e-4** | **0.068** |
+| `grid` @ 640 px | unfrozen | 60 | 1e-4 | **0.359** |
 
 Unfreezing the backbone is worth ~0.18 IoU on `metal_nut` and nothing that
 matters on `grid`. Roughly 1.6 s/epoch — the whole table is under 6 minutes of
@@ -133,6 +134,46 @@ it FNR and it will bound FNR, perfectly, forever, including in the regime where 
 answer is to flag everything. Nothing in the theory is violated by the `grid` row and
 nothing in the theory warns you about it either. The guard is empirical: measure the
 other side, on data the loss cannot see, and report both.
+
+## Does resolution fix `grid`?
+
+The obvious reading of the `grid` failure is that 320 px is too coarse: its defects
+are hairline threads and bent wires, and an INTER_AREA resize from 1024 px averages
+them into the background. That is a hypothesis, and the control split gives it a
+sharp test. Retrained at **640 px**, batch 4, everything else identical:
+
+| | `grid` @ 320 px | `grid` @ 640 px |
+|---|---|---|
+| best val IoU | 0.068 | **0.359** |
+| λ̂ at α = 0.10 | 0.090 | **0.030** |
+| held-out FNR | 0.010 ✓ | 0.009 ✓ |
+| false alarms at the **naive** 0.5 | 0.429 | **0.095** |
+| flagged area at the naive 0.5 | 13.9% | **0.013%** |
+| false alarms at **λ̂** | 1.000 | **1.000** |
+| flagged area at λ̂ | 89.8% | 75.6% |
+
+**Resolution was a real limitation of the model and not the binding constraint on the
+guarantee.** Four times the pixels bought a 5x better model by IoU, and at the naive
+threshold it is a different system: false alarms fall from 43% to 9.5%, and the mask
+it draws on a clean part shrinks from 13.9% of the frame to 0.013%. That is most of
+the way to something deployable.
+
+The calibrated operating point did not move at all. It still escalates **every**
+defect-free part. Note the direction λ̂ travelled: it went *down*, 0.090 to 0.030. A
+sharper model did not let the threshold relax, it forced it lower, because catching
+90% of the pixels in a one-pixel-wide thread means accepting anything faintly
+thread-like, and at 640 px there is more of the image to be faintly thread-like in.
+
+So the gap between the two operating points **widened**. Before, both were bad; now
+the naive threshold is good and the calibrated one is unchanged, which is a worse
+failure to have, because it is the one a summary statistic hides. Reporting IoU alone
+would have called this experiment a success.
+
+What it actually says: a pixel-level FNR target of 0.10 is the wrong contract for
+hairline defects at any resolution tested here. The next thing to try is not more
+pixels but a different loss, something at the level of the defect instance rather
+than the pixel, so that "found the thread" does not require "found 90% of the
+thread's pixels".
 
 ## ONNX export
 

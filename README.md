@@ -128,10 +128,19 @@ the evaluation tables in [`docs/results.md`](docs/results.md).
 The defect-free control split and the risk-curve plot are done, and both are in
 [`docs/results.md`](docs/results.md).
 
-The open item is `grid`. Its masks are useless at 320 px because the defects are thin
-threads and the resize destroys them, so the natural next step is tiled or
-high-resolution inference, and the honest test of that hypothesis is whether the
-false-alarm rate on clean parts falls away from 1.000.
+**The resolution hypothesis for `grid` was tested and only half of it survived.** The
+obvious explanation for its failure is that 320 px averages away hairline defects, so
+it was retrained at 640 px. The model improved a great deal: best validation IoU 0.068
+to **0.359**, and at the naive 0.5 threshold false alarms fell from 0.429 to **0.095**
+with the flagged area on a clean part down from 13.9% to **0.013%**. The calibrated
+operating point did not move: still **1.000**, every clean part escalated. λ̂ went
+*down*, 0.090 to 0.030, because catching 90% of the pixels in a one-pixel-wide thread
+means accepting anything faintly thread-like.
+
+Resolution was a real limit on the model and not the binding constraint on the
+guarantee. The open item is therefore not more pixels but a different contract: a
+loss defined on the defect instance rather than the pixel, so that "found the thread"
+stops requiring "found 90% of the thread's pixels".
 
 ## References
 
