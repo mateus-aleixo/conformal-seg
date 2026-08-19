@@ -6,6 +6,7 @@ conformal report would still look perfect. These tests pin the other half down.
 """
 
 import numpy as np
+import pytest
 
 from conformal_seg.conformal import control_curve, control_report
 from conformal_seg.data import discover_good_items, discover_items, load_image
@@ -93,3 +94,89 @@ def test_discovery_separates_good_from_defective(synth_root):
 def test_missing_good_dir_returns_empty(tmp_path):
     (tmp_path / "nocat" / "test").mkdir(parents=True)
     assert discover_good_items(tmp_path, "nocat") == []
+
+
+# -- instance-level loss ----------------------------------------------------
+
+
+def _thread_and_blob(size=40):
+    """A hairline defect and a compact one, the two regimes that diverge."""
+    target = np.zeros((size, size), dtype=bool)
+    target[5, 2:size - 2] = True          # 1 px wide: almost no interior
+    target[20:30, 20:30] = True           # compact
+    return target
+
+
+def test_instance_fnr_counts_defects_not_pixels():
+    from conformal_seg.metrics import instance_fnr
+
+    target = _thread_and_blob()
+    blob_only = np.zeros_like(target)
+    blob_only[20:30, 20:30] = True
+
+    assert instance_fnr(target, target) == 0.0          # both found
+    assert instance_fnr(blob_only, target) == 0.5       # one of two missed
+    assert instance_fnr(np.zeros_like(target), target) == 1.0
+    assert instance_fnr(np.zeros_like(target), np.zeros_like(target)) == 0.0
+
+
+def test_instance_fnr_forgives_clipped_ends_but_not_a_miss():
+    """The point of the loss: catching a thread counts even if its ends are
+    clipped, while missing it entirely does not."""
+    from conformal_seg.metrics import fnr, instance_fnr
+
+    target = np.zeros((40, 40), dtype=bool)
+    target[5, 2:38] = True
+    clipped = np.zeros_like(target)
+    clipped[5, 12:28] = True              # found, but only the middle
+
+    assert fnr(clipped, target) > 0.5     # pixel loss punishes this hard
+    assert instance_fnr(clipped, target) == 0.0   # the defect was found
+
+
+def test_instance_fnr_respects_min_overlap():
+    from conformal_seg.metrics import instance_fnr
+
+    target = np.zeros((40, 40), dtype=bool)
+    target[10:20, 10:20] = True           # 100 px
+    touch = np.zeros_like(target)
+    touch[10:11, 10:15] = True            # 5 px = 5% of the instance
+
+    assert instance_fnr(touch, target, min_overlap=0.01) == 0.0
+    assert instance_fnr(touch, target, min_overlap=0.50) == 1.0
+
+
+def test_instance_loss_is_monotone_in_the_threshold():
+    """Conformal risk control needs a loss that only rises as the mask shrinks."""
+    from conformal_seg.conformal import losses_at
+
+    rng = np.random.default_rng(4)
+    target = _thread_and_blob(32)
+    probs = [rng.uniform(0, 1, (32, 32)) for _ in range(10)]
+    masks = [target for _ in range(10)]
+
+    risks = [losses_at(probs, masks, t, "instance").mean() for t in np.linspace(0, 1, 21)]
+    assert all(b >= a - 1e-12 for a, b in zip(risks, risks[1:], strict=False))
+    assert risks[0] == 0.0    # t=0 flags everything, so nothing is missed
+
+
+def test_calibration_records_which_loss_it_was_fitted_under():
+    """A threshold without its loss is meaningless: the same number bounds a
+    different quantity under each."""
+    from conformal_seg.conformal import calibrate
+
+    rng = np.random.default_rng(5)
+    probs = [rng.uniform(0, 1, (32, 32)) for _ in range(12)]
+    masks = [_thread_and_blob(32) for _ in range(12)]
+
+    pixel = calibrate(probs, masks, alpha=0.1, loss="pixel")
+    inst = calibrate(probs, masks, alpha=0.1, loss="instance")
+
+    assert pixel.loss == "pixel" and inst.loss == "instance"
+    assert pixel.to_dict()["loss"] == "pixel"
+    # On hairline defects the instance loss admits a far higher threshold, which
+    # is the entire reason it exists.
+    assert inst.threshold > pixel.threshold
+
+    with pytest.raises(ValueError, match="unknown loss"):
+        calibrate(probs, masks, loss="iou")

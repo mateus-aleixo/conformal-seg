@@ -175,6 +175,75 @@ pixels but a different loss, something at the level of the defect instance rathe
 than the pixel, so that "found the thread" does not require "found 90% of the
 thread's pixels".
 
+## Changing the contract: an instance-level loss
+
+The resolution experiment said the pixel-level FNR target is the wrong contract
+for hairline defects. This tests that directly rather than asserting it.
+
+`instance_fnr` labels connected components of the ground truth and counts an
+instance as found when the predicted mask covers at least 10% of it. Missing a
+thread entirely still costs; clipping its ends does not. Like pixel FNR it is
+per-image, in [0, 1], and nondecreasing in the threshold, so conformal risk
+control applies unchanged: only the quantity being bounded changes.
+
+At α = 0.10, calibrated and evaluated exactly as before:
+
+| category | loss | λ̂ | held-out risk | mask area | false alarms on clean parts |
+|---|---|---|---|---|---|
+| `metal_nut` | pixel | 0.130 | 0.055 | 0.207 | 0.045 (1 of 22) |
+| **`metal_nut`** | **instance** | **0.290** | **0.025** | **0.186** | **0.000 (0 of 22)** |
+| `grid` @ 320 | pixel | 0.090 | 0.010 | 0.814 | 1.000 |
+| `grid` @ 320 | instance | 0.110 | 0.028 | 0.639 | 1.000 |
+| `grid` @ 640 | pixel | 0.030 | 0.009 | 0.734 | 1.000 |
+| **`grid` @ 640** | **instance** | **0.070** | **0.063** | **0.105** | **1.000** |
+
+### `metal_nut`: strictly better
+
+The instance loss more than doubles the admissible threshold (0.130 to 0.290),
+tightens the mask, and takes the false-alarm rate to **zero**. The system now
+auto-passes all 22 clean parts and still finds 97.5% of defect instances. The
+earlier operating point cost one false alarm in 22 to buy its guarantee; this one
+costs none.
+
+Nothing was lost. The bound changed from "misses at most 10% of defect pixels"
+to "misses at most 10% of defect instances", which is the question an inspection
+line was asking in the first place.
+
+### `grid`: the contract was wrong, and the model is still wrong
+
+At 640 px the instance loss shrinks the mask sevenfold, 0.734 to **0.105** of the
+frame, and on clean parts 0.756 to 0.167. That is a real improvement and it is
+not enough, because the false-alarm rate stays pinned at 1.000.
+
+The reason is visible in the distributions rather than the summary. At λ̂ = 0.070
+the median flagged area is **0.038 on defect images and 0.020 on clean ones**.
+They overlap. Sweeping the escalation trigger finds no operating point:
+
+| trigger | clean parts escalated | defect images flagged |
+|---|---|---|
+| 0.001 | 100.0% | 100.0% |
+| 0.05 | 28.6% | 33.3% |
+| 0.10 | 23.8% | 8.3% |
+| 0.20 | 19.0% | 8.3% |
+
+At a trigger of 0.10 the system escalates clean parts *more often than defective
+ones*. There is no threshold and no trigger that separates them, because the
+model has no discriminative signal on this category to separate with.
+
+### What the two experiments together establish
+
+The pixel-level contract was genuinely wrong: fixing it improved every category
+it was applied to, and on `metal_nut` it removed the last false alarm. It also
+cannot manufacture signal that is not there. `grid` has now been given the
+benefit of the doubt three times in sequence, more resolution, a better loss, and
+a swept decision trigger, and it fails each time for the same underlying reason:
+34 training images of a low-contrast texture is not enough to learn from.
+
+That is the honest end of this line. The next thing that would move `grid` is
+more labelled data or a different problem formulation (anomaly detection against
+a defect-free reference, which is what MVTec AD was built for), not another
+adjustment to the guarantee.
+
 ## ONNX export
 
 Parity against torch on random inputs, max |Δ|:

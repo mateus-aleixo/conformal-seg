@@ -54,6 +54,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--seed", type=int, default=17)
     p.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     p.add_argument("--out", type=Path, default=None)
+    p.add_argument("--loss", default="pixel", choices=["pixel", "instance"],
+                   help="what the guarantee bounds: fraction of defect PIXELS "
+                        "missed, or fraction of defect INSTANCES missed")
     p.add_argument("--min-area-frac", type=float, default=1e-3,
                    help="flagged area above which a part is escalated to a human")
     a = p.parse_args(argv)
@@ -65,7 +68,7 @@ def main(argv: list[str] | None = None) -> int:
 
     splits = split_items(discover_items(a.data_root, a.category), seed=a.seed)
     cal_probs, cal_masks = predict_probs(model, DefectSegDataset(splits["cal"], a.size), a.device)
-    cal = calibrate(cal_probs, cal_masks, alpha=a.alpha)
+    cal = calibrate(cal_probs, cal_masks, alpha=a.alpha, loss=a.loss)
 
     test_probs, test_masks = predict_probs(
         model, DefectSegDataset(splits["test"], a.size), a.device
@@ -91,8 +94,8 @@ def main(argv: list[str] | None = None) -> int:
         "control": control,
         "control_curve": [list(r) for r in curve],
     }, indent=2))
-    print(f"threshold {cal.threshold:.3f} (alpha={a.alpha}, n_cal={cal.n})")
-    print(f"held-out FNR mean {report['held_out_fnr_mean']:.4f} "
+    print(f"threshold {cal.threshold:.3f} (alpha={a.alpha}, n_cal={cal.n}, loss={cal.loss})")
+    print(f"held-out {cal.loss} FNR mean {report['held_out_fnr_mean']:.4f} "
           f"(target <= {a.alpha}), mask fraction {report['mean_predicted_mask_fraction']:.3f}")
     if control["n_control"]:
         naive, conf = control["at"]["naive"], control["at"]["conformal"]

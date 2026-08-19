@@ -34,6 +34,7 @@ Full numbers in [`docs/results.md`](docs/results.md). The short version:
 | | naive 0.5 | conformal | false alarms on clean parts | verdict |
 |---|---|---|---|---|
 | `metal_nut` | IoU 0.691, **FNR 0.167 ✗** | IoU 0.644, **FNR 0.055 ✓** | 0.000 → **0.045** (1 of 22) | the guarantee costs about 5 IoU points and one false alarm in 22, and fixes a 17% miss rate |
+| `metal_nut`, instance loss | | **instance FNR 0.025 ✓** at λ̂ 0.290 | **0.000** (0 of 22) | bounding missed *instances* rather than *pixels* removes the false alarm entirely |
 | `grid` | IoU 0.184, FNR 0.385 ✗ | IoU 0.015, **FNR 0.010 ✓**, **mask area 0.81** | 0.429 → **1.000** (21 of 21) | the guarantee is honoured by escalating every clean part: valid, and useless |
 
 `grid` is reported rather than buried. Conformal risk control guarantees *validity,
@@ -223,9 +224,28 @@ operating point did not move: still **1.000**, every clean part escalated. λ̂ 
 means accepting anything faintly thread-like.
 
 Resolution was a real limit on the model and not the binding constraint on the
-guarantee. The open item is therefore not more pixels but a different contract: a
-loss defined on the defect instance rather than the pixel, so that "found the thread"
-stops requiring "found 90% of the thread's pixels".
+guarantee. So the contract was changed too: `--loss instance` bounds the fraction of
+defect **instances** missed rather than defect **pixels**, using connected components
+of the ground truth, so that "found the thread" stops requiring "found 90% of the
+thread's pixels". Conformal risk control applies unchanged, since the new loss is
+still per-image, in [0, 1] and monotone in the threshold.
+
+**On `metal_nut` that is strictly better.** The admissible threshold more than
+doubles (0.130 to 0.290), the mask tightens, and the false-alarm rate goes to
+**zero**: all 22 clean parts auto-pass while 97.5% of defect instances are still
+found. The bound became the question an inspection line was asking anyway.
+
+**On `grid` it is not enough.** The mask shrinks sevenfold at 640 px, 0.734 to 0.105
+of the frame, and every clean part is still escalated. At λ̂ the median flagged area
+is 0.038 on defect images and 0.020 on clean ones: the distributions overlap, and
+sweeping the escalation trigger finds no operating point, since at a trigger of 0.10
+it escalates clean parts *more often* than defective ones.
+
+Taken together: the pixel contract was genuinely wrong and fixing it helped
+everywhere it applied, and it cannot manufacture signal that is not there. `grid` has
+now had more resolution, a better loss and a swept trigger, and fails each time for
+the same reason. What would move it is more labelled data or anomaly detection
+against a defect-free reference, not another adjustment to the guarantee.
 
 ## References
 

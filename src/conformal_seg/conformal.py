@@ -18,7 +18,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from .metrics import flagged_fraction, fnr, image_flagged
+from .metrics import flagged_fraction, fnr, image_flagged, instance_fnr
 
 
 @dataclass(frozen=True)
@@ -27,18 +27,40 @@ class Calibration:
     alpha: float
     n: int
     risk_curve: tuple[tuple[float, float], ...]  # (threshold, corrected risk)
+    # Which loss the threshold was fitted under. A threshold without this is
+    # meaningless: the same number bounds a different quantity under each.
+    loss: str = "pixel"
 
     def to_dict(self) -> dict:
         return {
             "threshold": self.threshold,
             "alpha": self.alpha,
             "n": self.n,
+            "loss": self.loss,
             "risk_curve": [list(p) for p in self.risk_curve],
         }
 
 
-def losses_at(probs: list[np.ndarray], masks: list[np.ndarray], t: float) -> np.ndarray:
-    return np.array([fnr(p >= t, m) for p, m in zip(probs, masks, strict=True)], dtype=float)
+# The loss the guarantee is *about*. Both are per-image, in [0, 1], and
+# nondecreasing in the threshold, which is all conformal risk control requires.
+# They ask different questions, and on hairline defects the answers diverge
+# sharply: see docs/results.md.
+LOSSES = {
+    "pixel": fnr,            # fraction of true defect PIXELS missed
+    "instance": instance_fnr,  # fraction of defect INSTANCES missed
+}
+
+
+def losses_at(
+    probs: list[np.ndarray],
+    masks: list[np.ndarray],
+    t: float,
+    loss: str = "pixel",
+) -> np.ndarray:
+    fn = LOSSES[loss]
+    return np.array(
+        [fn(p >= t, m) for p, m in zip(probs, masks, strict=True)], dtype=float
+    )
 
 
 def calibrate(
@@ -46,8 +68,15 @@ def calibrate(
     masks: list[np.ndarray],
     alpha: float = 0.10,
     grid: np.ndarray | None = None,
+    loss: str = "pixel",
 ) -> Calibration:
-    """probs: per-image sigmoid maps in [0,1]; masks: binary ground truth."""
+    """probs: per-image sigmoid maps in [0,1]; masks: binary ground truth.
+
+    `loss` selects what the guarantee is about: "pixel" bounds the fraction of
+    defect pixels missed, "instance" the fraction of defect instances missed.
+    """
+    if loss not in LOSSES:
+        raise ValueError(f"unknown loss {loss!r}; expected one of {sorted(LOSSES)}")
     if len(probs) != len(masks) or not probs:
         raise ValueError("probs and masks must be equal-length and non-empty")
     n = len(probs)
@@ -57,23 +86,26 @@ def calibrate(
     curve: list[tuple[float, float]] = []
     best = 0.0  # t=0 predicts every pixel: FNR = 0 everywhere; always feasible
     for t in grid:
-        risk = float(losses_at(probs, masks, float(t)).mean())
+        risk = float(losses_at(probs, masks, float(t), loss).mean())
         corrected = (n / (n + 1)) * risk + 1.0 / (n + 1)
         curve.append((float(t), corrected))
         if corrected <= alpha:
             best = float(t)  # grid ascends: keep the largest feasible t
-    return Calibration(threshold=best, alpha=alpha, n=n, risk_curve=tuple(curve))
+    return Calibration(
+        threshold=best, alpha=alpha, n=n, loss=loss, risk_curve=tuple(curve)
+    )
 
 
 def held_out_report(
     probs: list[np.ndarray], masks: list[np.ndarray], cal: Calibration
 ) -> dict:
     """The number that goes in docs/results.md: risk on data the threshold never saw."""
-    losses = losses_at(probs, masks, cal.threshold)
+    losses = losses_at(probs, masks, cal.threshold, cal.loss)
     mask_sizes = [float((p >= cal.threshold).mean()) for p in probs]
     return {
         "alpha": cal.alpha,
         "threshold": cal.threshold,
+        "loss": cal.loss,
         "held_out_fnr_mean": float(losses.mean()),
         "held_out_fnr_max": float(losses.max()),
         "mean_predicted_mask_fraction": float(np.mean(mask_sizes)),

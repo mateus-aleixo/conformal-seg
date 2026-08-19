@@ -13,11 +13,18 @@ from pydantic import BaseModel, Field
 
 
 class Guarantee(BaseModel):
-    alpha: float = Field(..., description="Bound on the fraction of defect pixels missed.")
+    alpha: float = Field(..., description="Bound on the risk named by `loss`.")
+    loss: str = Field(
+        "pixel",
+        description="What alpha bounds: 'pixel' the fraction of defect PIXELS "
+        "missed, 'instance' the fraction of defect INSTANCES missed. The same "
+        "threshold means a different promise under each.",
+    )
     threshold: float = Field(..., description="Calibrated mask threshold that delivers it.")
     n_calibration: int
     held_out_fnr: float = Field(
-        ..., description="Measured miss rate on the held-out split; should sit under alpha."
+        ..., description="Measured miss rate under `loss` on the held-out split; "
+        "should sit under alpha."
     )
     false_alarm_rate: float | None = Field(
         None,
@@ -48,6 +55,7 @@ class PredictResponse(BaseModel):
 class ModelInfo(BaseModel):
     category: str
     source_run: str
+    loss: str
     input_size: int
     threshold: float
     alpha: float

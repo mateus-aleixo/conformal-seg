@@ -69,6 +69,9 @@ def build(run_dir: Path, out_dir: Path, category: str | None = None) -> Path:
         "input_size": input_size(onnx),
         "threshold": cal["threshold"],
         "alpha": cal["alpha"],
+        # Which loss the threshold bounds. The same number means a different
+        # promise under each, so it is not optional metadata.
+        "loss": cal.get("loss", "pixel"),
         "n_calibration": cal["n"],
         "held_out": {
             "fnr_mean": held["held_out_fnr_mean"],

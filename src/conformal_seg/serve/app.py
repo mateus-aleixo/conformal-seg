@@ -63,6 +63,7 @@ class Bundle:
     def guarantee(self) -> Guarantee:
         return Guarantee(
             alpha=self.manifest["alpha"],
+            loss=self.manifest.get("loss", "pixel"),
             threshold=self.threshold,
             n_calibration=self.manifest["n_calibration"],
             held_out_fnr=self.manifest["held_out"]["fnr_mean"],
@@ -105,6 +106,7 @@ def models() -> list[ModelInfo]:
             ModelInfo(
                 category=m["category"],
                 source_run=m["source_run"],
+                loss=m.get("loss", "pixel"),
                 input_size=m["input_size"],
                 threshold=m["threshold"],
                 alpha=m["alpha"],
