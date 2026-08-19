@@ -5,6 +5,10 @@ data/
 
 # artifacts
 runs/
+# ...except the calibration reports: a few KB each, they ARE the published
+# numbers, and scripts/make_control_figure.py rebuilds the figure from them
+# without a GPU or a dataset download.
+!runs/*/calibration.json
 *.pt
 *.onnx
 *.png

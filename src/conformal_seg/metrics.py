@@ -33,3 +33,20 @@ def fnr(pred: np.ndarray, target: np.ndarray) -> float:
         return 0.0
     missed = (target & ~pred.astype(bool)).sum()
     return float(missed / total)
+
+
+def flagged_fraction(pred: np.ndarray) -> float:
+    """Fraction of pixels the mask flags. On a defect-free part this is pure
+    false alarm: every flagged pixel is wrong by construction."""
+    return float(pred.astype(bool).mean())
+
+
+def image_flagged(pred: np.ndarray, min_area_frac: float = 1e-3) -> bool:
+    """Would an inspection line escalate this part to a human?
+
+    A pixel mask is not a decision. Real lines act on a part when the flagged
+    region is big enough to be worth looking at, so a single stray pixel does
+    not stop the belt. `min_area_frac` is that trigger, as a fraction of the
+    image; 1e-3 is ~100 px at 320x320.
+    """
+    return bool(pred.astype(bool).mean() >= min_area_frac)

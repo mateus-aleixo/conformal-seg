@@ -18,7 +18,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from .metrics import fnr
+from .metrics import flagged_fraction, fnr, image_flagged
 
 
 @dataclass(frozen=True)
@@ -79,3 +79,64 @@ def held_out_report(
         "mean_predicted_mask_fraction": float(np.mean(mask_sizes)),
         "n_test": len(probs),
     }
+
+
+def control_report(
+    good_probs: list[np.ndarray],
+    thresholds: dict[str, float],
+    min_area_frac: float = 1e-3,
+) -> dict:
+    """False alarms on defect-free parts, at each named threshold.
+
+    The conformal guarantee bounds what the mask MISSES on defective parts. It
+    says nothing whatsoever about clean ones, and it buys its miss rate by
+    lowering the threshold, which can only flag more. This is the other half of
+    the decision the README claims to answer -- "can this part ship without a
+    human looking at it?" -- measured on parts that are fine.
+
+    Reported per threshold so the naive and conformal operating points can be
+    compared on the same parts.
+    """
+    if not good_probs:
+        return {"n_control": 0, "min_area_frac": min_area_frac, "at": {}}
+    out: dict = {
+        "n_control": len(good_probs),
+        "min_area_frac": min_area_frac,
+        "at": {},
+    }
+    for name, t in thresholds.items():
+        preds = [p >= float(t) for p in good_probs]
+        flagged = [flagged_fraction(q) for q in preds]
+        alarms = [image_flagged(q, min_area_frac) for q in preds]
+        out["at"][name] = {
+            "threshold": float(t),
+            "mean_flagged_pixel_fraction": float(np.mean(flagged)),
+            "max_flagged_pixel_fraction": float(np.max(flagged)),
+            "image_false_alarm_rate": float(np.mean(alarms)),
+        }
+    return out
+
+
+def control_curve(
+    good_probs: list[np.ndarray],
+    grid: np.ndarray | None = None,
+    min_area_frac: float = 1e-3,
+) -> tuple[tuple[float, float, float], ...]:
+    """(threshold, mean flagged fraction, image false-alarm rate) over a grid.
+
+    Plotted against the risk curve this is the whole trade in one picture: risk
+    falls as the threshold drops, false alarms rise.
+    """
+    if grid is None:
+        grid = np.linspace(0.0, 1.0, 101)
+    if not good_probs:
+        return ()
+    rows = []
+    for t in grid:
+        preds = [p >= float(t) for p in good_probs]
+        rows.append((
+            float(t),
+            float(np.mean([flagged_fraction(q) for q in preds])),
+            float(np.mean([image_flagged(q, min_area_frac) for q in preds])),
+        ))
+    return tuple(rows)

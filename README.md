@@ -31,14 +31,24 @@ test image closest to that category's held-out mean, not the best-looking one.*
 
 Full numbers in [`docs/results.md`](docs/results.md). The short version:
 
-| | naive 0.5 | conformal | verdict |
-|---|---|---|---|
-| `metal_nut` | IoU 0.691, **FNR 0.167 ✗** | IoU 0.644, **FNR 0.055 ✓** | the guarantee costs about 5 IoU points and fixes a 17% miss rate |
-| `grid` | IoU 0.184, FNR 0.385 ✗ | IoU 0.015, **FNR 0.010 ✓**, **mask area 0.81** | the guarantee is honoured by flagging 81% of the image: valid, and useless |
+| | naive 0.5 | conformal | false alarms on clean parts | verdict |
+|---|---|---|---|---|
+| `metal_nut` | IoU 0.691, **FNR 0.167 ✗** | IoU 0.644, **FNR 0.055 ✓** | 0.000 → **0.045** (1 of 22) | the guarantee costs about 5 IoU points and one false alarm in 22, and fixes a 17% miss rate |
+| `grid` | IoU 0.184, FNR 0.385 ✗ | IoU 0.015, **FNR 0.010 ✓**, **mask area 0.81** | 0.429 → **1.000** (21 of 21) | the guarantee is honoured by escalating every clean part: valid, and useless |
 
 `grid` is reported rather than buried. Conformal risk control guarantees *validity,
 not utility*, and a category where the model fails is the clearest way to show what
 the method does and does not buy you.
+
+The last column is the point of the **defect-free control split**. The conformal loss
+is the fraction of true defect pixels a mask misses, so a part with no defects
+contributes zero loss whatever the mask does: the guarantee is blind, by
+construction, to how often a good part gets stopped. Scoring the same models on
+MVTec's untouched `test/good/` images answers it. On `metal_nut` the guarantee is
+nearly free, one clean part in 22. On `grid` it escalates **all of them**, which
+turns "the mask is too big" from an aesthetic complaint into a throughput of zero.
+
+![The curve calibration reads and the one it ignores](docs/figures/operating_point.png)
 
 ## Why put a guarantee on a mask
 
@@ -76,6 +86,10 @@ when the model is *provably* careful enough, and escalate the rest.
 - **Calibration.** `conformal.py` implements conformal risk control over the
   threshold grid, the FNR-against-λ risk curve, and held-out verification. Same
   correction and same small-n honesty as the sibling repos.
+- **Control split.** `calibrate` also scores the defect-free `test/good/` images the
+  loss cannot see, reporting the false-alarm rate and flagged area at both the naive
+  and conformal thresholds. A guarantee reported without this number is half a
+  result.
 - **Export.** ONNX (opset 18) plus a parity check with max |Δ| logged. `predict.py`
   runs on onnxruntime only, with no torch at inference, following the conformal-rul
   serving pattern.
@@ -111,9 +125,13 @@ uv pip install --reinstall --index-url https://download.pytorch.org/whl/cu126 \
 Both categories are trained, calibrated, exported to ONNX and parity-checked, with
 the evaluation tables in [`docs/results.md`](docs/results.md).
 
-Known limits and the natural next steps: tiled or high-resolution inference, which is
-what `grid` actually needs; a plotted risk curve; and a defect-free control split to
-measure the false-alarm side of the trade.
+The defect-free control split and the risk-curve plot are done, and both are in
+[`docs/results.md`](docs/results.md).
+
+The open item is `grid`. Its masks are useless at 320 px because the defects are thin
+threads and the resize destroys them, so the natural next step is tiled or
+high-resolution inference, and the honest test of that hypothesis is whether the
+false-alarm rate on clean parts falls away from 1.000.
 
 ## References
 

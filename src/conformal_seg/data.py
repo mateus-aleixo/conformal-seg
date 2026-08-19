@@ -123,8 +123,12 @@ class DefectSegDataset(Dataset):
 # -- synthetic fixtures (tests / CI: no dataset, no network) -----------------
 
 def make_synthetic_dir(root: Path, category: str = "synth", n: int = 12, size: int = 96,
-                       seed: int = 5) -> Path:
-    """Random ellipse 'defects' on noise, in the exact MVTec layout."""
+                       seed: int = 5, n_good: int = 6) -> Path:
+    """Random ellipse 'defects' on noise, in the exact MVTec layout.
+
+    Also writes `n_good` defect-free images under test/good/, mirroring MVTec, so
+    the control split has something to exercise in CI.
+    """
     rng = np.random.default_rng(seed)
     img_dir = root / category / "test" / "blob"
     gt_dir = root / category / "ground_truth" / "blob"
@@ -139,4 +143,54 @@ def make_synthetic_dir(root: Path, category: str = "synth", n: int = 12, size: i
         img[mask == 1] = (220, 60, 60)  # defect is visibly different: learnable
         cv2.imwrite(str(img_dir / f"{i:03d}.png"), cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
         Image.fromarray(mask * 255).save(gt_dir / f"{i:03d}_mask.png")
+
+    good_dir = root / category / "test" / "good"
+    good_dir.mkdir(parents=True, exist_ok=True)
+    for i in range(n_good):
+        img = (rng.uniform(40, 90, (size, size, 3))).astype(np.uint8)  # no ellipse
+        cv2.imwrite(str(good_dir / f"{i:03d}.png"), cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
     return root
+
+
+# -- defect-free control split ----------------------------------------------
+#
+# MVTec's test/good/ images carry no mask because there is nothing to annotate.
+# discover_items() skips them, which is right for fitting and for measuring FNR:
+# a defect-free image has no defect pixels to miss, so it cannot inform a loss
+# defined as "fraction of true defect pixels missed".
+#
+# It can, however, answer the other half of the question. The conformal
+# threshold is chosen well below 0.5 to stop missing defects, and nothing so far
+# measures what that costs on parts that are fine. These images are the control.
+
+
+def discover_good_items(root: Path, category: str) -> list[Path]:
+    """Defect-free test images of a category, in sorted order."""
+    good = root / category / "test" / "good"
+    return sorted(good.glob("*.png")) if good.is_dir() else []
+
+
+def load_image(path: Path, size: int) -> np.ndarray:
+    """image float32 [0,1] RGB HWC. Same decode path as load_pair, no mask."""
+    bgr = cv2.imread(str(path), cv2.IMREAD_COLOR)
+    if bgr is None:
+        raise FileNotFoundError(path)
+    rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
+    rgb = cv2.resize(rgb, (size, size), interpolation=cv2.INTER_AREA)
+    return rgb.astype(np.float32) / 255.0
+
+
+class GoodImageDataset(Dataset):
+    """Defect-free images only. Yields the input tensor; there is no target."""
+
+    def __init__(self, paths: list[Path], size: int = 320):
+        self.paths = paths
+        self.size = size
+
+    def __len__(self) -> int:
+        return len(self.paths)
+
+    def __getitem__(self, i: int) -> torch.Tensor:
+        rgb = load_image(self.paths[i], self.size)
+        x = (rgb - _IMAGENET_MEAN) / _IMAGENET_STD
+        return torch.from_numpy(x.transpose(2, 0, 1).copy())

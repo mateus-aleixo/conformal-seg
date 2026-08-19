@@ -85,6 +85,55 @@ are a few pixels wide), more annotated data, and a texture-anomaly approach rath
 than supervised segmentation — which is what MVTec AD is designed for in the first
 place.
 
+## The defect-free control split
+
+Everything above measures the model on **defective** parts. That is what the
+conformal loss is defined on: FNR is the fraction of true defect pixels the mask
+misses, so a part with no defects contributes a loss of exactly 0 no matter what the
+mask does. The guarantee is therefore blind, by construction, to the question an
+inspection line actually asks: **of the parts that are fine, how many get stopped?**
+
+MVTec ships those parts under `test/good/` and nothing here was using them. They are
+the control: 22 defect-free `metal_nut` images and 21 `grid` images, scored by the
+same model at the same two thresholds. A part is counted as escalated when the mask
+flags at least 0.1% of the frame (~100 px at 320x320), so a single stray pixel does
+not stop the belt.
+
+![The curve calibration reads and the one it ignores](figures/operating_point.png)
+
+| category | threshold | false-alarm rate | mean flagged area on a clean part |
+|---|---|---|---|
+| `metal_nut` | 0.500 (naive) | **0.000** | 0.000% |
+| `metal_nut` | 0.130 (conformal) | **0.045** (1 of 22) | 0.016% |
+| `grid` | 0.500 (naive) | 0.429 (9 of 21) | 13.9% |
+| `grid` | 0.090 (conformal) | **1.000** (21 of 21) | 89.8% |
+
+**`metal_nut`: the guarantee is close to free on this side.** Buying the drop from a
+16.7% miss rate to 5.5% costs one false alarm in 22 clean parts, and the mask it
+draws on that one part covers 0.016% of the frame. A line running this model
+auto-passes 21 of 22 good parts and catches 94.5% of defect pixels on bad ones. That
+is a system worth deploying, and until now the repo could not say so: it had measured
+only half of it.
+
+**`grid`: the control split is what turns "useless" from an opinion into a number.**
+The earlier sections said the guarantee held by flagging 81% of the image, which
+*looks* bad. The control says exactly how bad: at λ̂ = 0.09 **every single
+defect-free part is escalated**. The model does not merely produce large masks, it
+sends 100% of the line to a human. Its throughput contribution is zero, and no
+statement about coverage or validity changes that.
+
+Note the naive threshold already fails `grid` on both counts, at 0.429 false alarms
+*and* a 38.5% miss rate. Conformal calibration did not break this category; it
+inherited a model that never learned it and honoured its promise the only way left.
+
+### Why this belongs in a conformal repo
+
+Conformal risk control guarantees **marginal validity on the loss you hand it**. Hand
+it FNR and it will bound FNR, perfectly, forever, including in the regime where the
+answer is to flag everything. Nothing in the theory is violated by the `grid` row and
+nothing in the theory warns you about it either. The guard is empirical: measure the
+other side, on data the loss cannot see, and report both.
+
 ## ONNX export
 
 Parity against torch on random inputs, max |Δ|:
